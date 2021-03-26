@@ -1,9 +1,12 @@
 class WinesController < ApplicationController
   before_action :set_wine, only: %i[ show edit update destroy ]
+  before_action :set_strains, only: %i[ new edit create ]
+  before_action :set_wine_strains, only: %i[ new edit create ]
+  before_action :authorize_admin,  except: %i[ index show  ]
 
   # GET /wines or /wines.json
   def index
-    @wines = Wine.all
+    @wines = Wine.includes([wine_strains: [:strain]]).all   
   end
 
   # GET /wines/1 or /wines/1.json
@@ -13,10 +16,17 @@ class WinesController < ApplicationController
   # GET /wines/new
   def new
     @wine = Wine.new
+    @strains = Strain.pluck(:name, :id)
+    @wine.wine_strains.build
+    @wine.wine_strains.build
+    @wine.wine_strains.build
   end
 
   # GET /wines/1/edit
   def edit
+    @strains = Strain.order(name: :asc)
+    @wine.wine_strains.build
+    @strains = Strain.pluck(:name, :id)
   end
 
   # POST /wines or /wines.json
@@ -25,14 +35,16 @@ class WinesController < ApplicationController
 
     respond_to do |format|
       if @wine.save
-        format.html { redirect_to @wine, notice: "Wine was successfully created." }
+        format.html { redirect_to @wine, notice: 'Wine was successfully created.' }
         format.json { render :show, status: :created, location: @wine }
       else
-        format.html { render :new, status: :unprocessable_entity }
+        format.html { render :new }
         format.json { render json: @wine.errors, status: :unprocessable_entity }
       end
     end
   end
+
+
 
   # PATCH/PUT /wines/1 or /wines/1.json
   def update
@@ -56,14 +68,38 @@ class WinesController < ApplicationController
     end
   end
 
+
+
   private
     # Use callbacks to share common setup or constraints between actions.
     def set_wine
       @wine = Wine.find(params[:id])
     end
 
+    def set_strains
+      @strains = Strain.all
+    end
+
+    def authorize_admin
+      #unless current_user&.admin?
+      if user_signed_in?  
+        unless current_user.admin?
+          flash[:error] = "Debes ser administrador para modificar vinos"
+          redirect_to wines_path
+        end
+      else
+         flash[:error] = "Debes iniciar sesion para modificar vinos"
+         redirect_to new_user_session_path
+      end
+    end
+
+    def set_wine_strains
+      @wine_strains = WineStrain.all
+    end
+
+
     # Only allow a list of trusted parameters through.
     def wine_params
-      params.require(:wine).permit(:name)
+      params.require(:wine).permit(:name, wine_strains_attributes: [:id, :percentage, :wine_id, :strain_id])
     end
 end
